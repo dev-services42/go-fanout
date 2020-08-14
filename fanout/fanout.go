@@ -2,7 +2,7 @@ package fanout
 
 import (
 	"context"
-	"github.comdev-services42/go-fanout/fanout/state"
+	"github.com/dev-services42/go-fanout/fanout/state"
 	"sync"
 )
 
