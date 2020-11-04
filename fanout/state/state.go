@@ -1,32 +1,48 @@
 package state
 
-import "sync"
-
 type State struct {
-	cond    *sync.Cond
-	message interface{}
+	next    *State
+	value   interface{}
+	hasNext chan struct{}
 }
 
-func New() *State {
+func New(value interface{}) *State {
+	state := newState()
+	state.value = value
+	state.next = newState()
+	return state
+}
+
+func newState() *State {
 	return &State{
-		cond:    sync.NewCond(new(sync.Mutex)),
-		message: nil,
+		next:    nil,
+		value:   nil,
+		hasNext: make(chan struct{}),
 	}
 }
 
-func (s *State) Get() interface{} {
-	defer s.cond.L.Unlock()
-
-	s.cond.L.Lock()
-	s.cond.Wait()
-
-	return s.message
+func (s *State) WaitChange() <-chan struct{} {
+	return s.hasNext
 }
 
-func (s *State) Set(message interface{}) {
-	s.cond.L.Lock()
-	s.message = message
-	s.cond.L.Unlock()
+func (s *State) Next() *State {
+	return s.next
+}
 
-	s.cond.Broadcast()
+func (s *State) Value() interface{} {
+	return s.value
+}
+
+func (s *State) Set(value interface{}) {
+	s.next.next = newState()
+	s.next.value = value
+	close(s.hasNext)
+}
+
+func (s *State) Clone() *State {
+	state := newState()
+	state.next = s.next
+	state.value = s.value
+	state.hasNext = s.hasNext
+	return state
 }

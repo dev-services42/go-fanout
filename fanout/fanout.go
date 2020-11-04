@@ -7,50 +7,54 @@ import (
 )
 
 type FanOut struct {
-	wg    *sync.WaitGroup
-	state *state.State
+	wg         *sync.WaitGroup
+	stateMutex *sync.RWMutex
+	state      *state.State
 }
 
 func New() *FanOut {
 	return &FanOut{
-		wg:    new(sync.WaitGroup),
-		state: state.New(),
+		wg:         new(sync.WaitGroup),
+		stateMutex: new(sync.RWMutex),
+		state:      state.New(nil),
 	}
 }
 
-func (s *FanOut) Subscribe(ctx context.Context, filterFn func(interface{}) bool) (<-chan interface{}, error) {
+func (s *FanOut) Subscribe(ctx context.Context, filterFn func(interface{}) bool) <-chan interface{} {
 	ch := make(chan interface{})
 
+	s.stateMutex.RLock()
+	curState := s.state.Clone()
+	s.stateMutex.RUnlock()
+
 	s.wg.Add(1)
-	ready := make(chan struct{})
 	go func() {
 		defer s.wg.Done()
 		defer close(ch)
-
-		close(ready)
-
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			default:
-				payload := s.state.Get()
-				if !filterFn(payload) {
+			case <-curState.WaitChange():
+				curState = curState.Next()
+				value := curState.Value()
+				if !filterFn(value) {
 					continue
 				}
 
-				ch <- payload
+				ch <- value
 			}
 		}
 	}()
 
-	<-ready
-
-	return ch, nil
+	return ch
 }
 
-func (s *FanOut) Broadcast(payload interface{}) {
-	s.state.Set(payload)
+func (s *FanOut) Broadcast(value interface{}) {
+	s.stateMutex.Lock()
+	s.state.Set(value)
+	s.state = s.state.Next()
+	s.stateMutex.Unlock()
 }
 
 func (s *FanOut) Wait() {
