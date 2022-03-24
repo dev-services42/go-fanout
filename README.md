@@ -13,34 +13,31 @@ import (
 )
 
 func simpleConsumer(ctx context.Context, id int, f *fanout.FanOut) {
-	ch, err := f.Subscribe(ctx, fanout.AllowAll)
-	if err != nil {
-		panic(err)
-	}
+	ch := f.Subscribe(ctx, fanout.AllowAll)
 
 	fmt.Println(fmt.Sprintf("Consumer %d is ready", id))
 	go func() {
 		for payload := range ch {
-			fmt.Println(fmt.Sprintf("Consumer %d receive payload %v", id, payload))
+			fmt.Println(fmt.Sprintf("Consumer %d receive payload `%v`", id, payload))
 		}
 	}()
 }
 
 func main() {
 	f := fanout.New()
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 
 	simpleConsumer(ctx, 1, f)
 	simpleConsumer(ctx, 2, f)
 	simpleConsumer(ctx, 3, f)
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 1; i++ {
 		f.Broadcast(fmt.Sprintf("hello %d", i))
 		time.Sleep(time.Second)
 	}
 
+	cancel()
 	f.Wait()
 }
-
 ```
 
