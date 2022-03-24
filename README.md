@@ -31,7 +31,7 @@ func main() {
 	simpleConsumer(ctx, 2, f)
 	simpleConsumer(ctx, 3, f)
 
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 3; i++ {
 		f.Broadcast(fmt.Sprintf("hello %d", i))
 		time.Sleep(time.Second)
 	}
